@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Social Briefing Setup</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f4f1; min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; }
+  .card { background: #fff; border-radius: 12px; border: 1px solid #e8e6e0; padding: 36px; width: 100%; max-width: 560px; }
+  .brand { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #aaa; margin-bottom: 24px; }
+  .step-bar { display: flex; gap: 5px; margin-bottom: 28px; }
+  .step-dot { height: 3px; flex: 1; border-radius: 2px; background: #e8e6e0; transition: background 0.3s; }
+  .step-dot.done { background: #222; }
+  .step-dot.active { background: #888; }
+  h2 { font-size: 20px; font-weight: 600; color: #111; margin-bottom: 5px; }
+  .sub { font-size: 13px; color: #777; line-height: 1.6; margin-bottom: 24px; }
+  label { font-size: 12px; color: #555; display: block; margin-bottom: 5px; font-weight: 500; }
+  input, textarea, select { width: 100%; padding: 9px 11px; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; background: #fff; color: #111; margin-bottom: 14px; font-family: inherit; transition: border-color 0.15s; }
+  input:focus, textarea:focus { outline: none; border-color: #888; }
+  textarea { min-height: 76px; resize: vertical; line-height: 1.5; }
+  .tag-group { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .tag { font-size: 12px; padding: 5px 12px; border-radius: 20px; border: 1px solid #ddd; color: #555; cursor: pointer; background: #fff; transition: all 0.15s; user-select: none; }
+  .tag:hover { border-color: #aaa; }
+  .tag.on { background: #111; color: #fff; border-color: #111; }
+  .btn-row { display: flex; gap: 8px; margin-top: 8px; }
+  .btn { padding: 9px 20px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid #ddd; background: #fff; color: #333; transition: background 0.15s; font-family: inherit; }
+  .btn:hover { background: #f5f4f1; }
+  .btn-primary { background: #111; color: #fff; border-color: #111; }
+  .btn-primary:hover { background: #333; }
+  .output-box { background: #f9f8f5; border: 1px solid #e8e6e0; border-radius: 8px; padding: 14px; font-size: 12px; font-family: 'Menlo', 'Monaco', monospace; color: #444; white-space: pre-wrap; line-height: 1.7; max-height: 320px; overflow-y: auto; margin-bottom: 10px; }
+  .copy-btn { width: 100%; margin-bottom: 20px; }
+  .setup-block { border: 1px solid #e8e6e0; border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; }
+  .setup-num { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px; }
+  .setup-block p { font-size: 13px; color: #555; line-height: 1.6; }
+  .setup-block strong { color: #111; font-weight: 600; }
+  .success-icon { width: 40px; height: 40px; border-radius: 50%; background: #f0f9f0; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+  .note { font-size: 12px; color: #999; line-height: 1.6; margin-top: 16px; padding-top: 16px; border-top: 1px solid #eee; }
+  .copy-flash { color: #2a7a2a; font-size: 12px; display: none; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand">Daily Social Briefing</div>
+  <div id="app"></div>
+</div>
+
+<script>
+const state = {
+  step: 0,
+  name: '', firstName: '', role: '',
+  linkedin: '', instagram: '', facebook: '', twitter: '', extraAccounts: '',
+  family: '', friends: '',
+  platforms: ['LinkedIn','Instagram','Facebook'],
+  workInterests: '', personalInterests: '',
+  tone: 'professional',
+  outputDest: 'Slack DM to myself',
+};
+
+const PLATFORMS = ['LinkedIn','Instagram','Facebook','Twitter/X','TikTok','YouTube','Threads'];
+const TONES = ['professional','casual and warm','concise and direct','witty and playful'];
+const DESTINATIONS = ['Slack DM to myself','Google Doc','Email','Claude chat window'];
+const STEPS = ['You','Accounts','People','Interests','Your Prompt'];
+
+function render() {
+  const app = document.getElementById('app');
+
+  const bar = STEPS.map((s,i) =>
+    `<div class="step-dot${i < state.step ? ' done' : i === state.step ? ' active' : ''}" title="${s}"></div>`
+  ).join('');
+
+  let inner = `<div class="step-bar">${bar}</div>`;
+
+  if (state.step === 0) {
+    inner += `
+      <h2>Who are you?</h2>
+      <p class="sub">This briefing will be built around your life. A few basics to get started.</p>
+      <label>Full name</label>
+      <input id="f-name" placeholder="Katherine Caswell" value="${esc(state.name)}">
+      <label>What you'd like to be called</label>
+      <input id="f-fname" placeholder="Kat" value="${esc(state.firstName)}">
+      <label>Your main role or focus (optional)</label>
+      <input id="f-role" placeholder="e.g. teacher, entrepreneur, designer..." value="${esc(state.role)}">
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="s0()">Continue</button>
+      </div>`;
+  } else if (state.step === 1) {
+    inner += `
+      <h2>Your social accounts</h2>
+      <p class="sub">Paste your profile URLs. The briefing will track your own activity and engagement. Leave blank anything you don't use.</p>
+      <label>LinkedIn</label>
+      <input id="f-li" placeholder="https://linkedin.com/in/yourhandle" value="${esc(state.linkedin)}">
+      <label>Instagram</label>
+      <input id="f-ig" placeholder="https://instagram.com/yourhandle" value="${esc(state.instagram)}">
+      <label>Facebook</label>
+      <input id="f-fb" placeholder="https://facebook.com/yourprofile" value="${esc(state.facebook)}">
+      <label>Twitter / X</label>
+      <input id="f-tw" placeholder="https://x.com/yourhandle" value="${esc(state.twitter)}">
+      <label>Any other accounts (business pages, TikTok, etc)</label>
+      <textarea id="f-extra" placeholder="One per line...">${esc(state.extraAccounts)}</textarea>
+      <div class="btn-row">
+        <button class="btn" onclick="go(0)">Back</button>
+        <button class="btn btn-primary" onclick="s1()">Continue</button>
+      </div>`;
+  } else if (state.step === 2) {
+    inner += `
+      <h2>People to track</h2>
+      <p class="sub">Who do you want the briefing to watch for? The briefing surfaces their public posts and drafts suggested replies for you.</p>
+      <label>Family members</label>
+      <textarea id="f-fam" placeholder="e.g. Tom Caswell (brother), Sarah Caswell, Ryan, Jordan, Becca...">${esc(state.family)}</textarea>
+      <label>Friends and colleagues</label>
+      <textarea id="f-friends" placeholder="e.g. close friends, work contacts you want to stay in touch with...">${esc(state.friends)}</textarea>
+      <div class="btn-row">
+        <button class="btn" onclick="go(1)">Back</button>
+        <button class="btn btn-primary" onclick="s2()">Continue</button>
+      </div>`;
+  } else if (state.step === 3) {
+    const tagHtml = PLATFORMS.map(p =>
+      `<span class="tag${state.platforms.includes(p)?' on':''}" onclick="toggleP('${p}')">${p}</span>`
+    ).join('');
+    const toneHtml = TONES.map(t =>
+      `<span class="tag${state.tone===t?' on':''}" onclick="setT('${t}')">${t}</span>`
+    ).join('');
+    inner += `
+      <h2>Your interests</h2>
+      <p class="sub">Tell the briefing where to focus its attention each day.</p>
+      <label>Platforms to scan</label>
+      <div class="tag-group">${tagHtml}</div>
+      <label>Work or professional topics</label>
+      <textarea id="f-work" placeholder="e.g. AI, marketing, real estate, your company, industry news...">${esc(state.workInterests)}</textarea>
+      <label>Personal interests (optional)</label>
+      <textarea id="f-personal" placeholder="e.g. travel, food, photography, fitness...">${esc(state.personalInterests)}</textarea>
+      <label>Tone for suggested replies and post drafts</label>
+      <div class="tag-group">${toneHtml}</div>
+      <div class="btn-row">
+        <button class="btn" onclick="go(2)">Back</button>
+        <button class="btn btn-primary" onclick="s3()">Continue</button>
+      </div>`;
+  } else if (state.step === 4) {
+    const destHtml = DESTINATIONS.map(d =>
+      `<span class="tag${state.outputDest===d?' on':''}" onclick="setD('${d}')">${d}</span>`
+    ).join('');
+    const prompt = buildPrompt();
+    inner += `
+      <div class="success-icon">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><polyline points="4,10 8,14 16,6" stroke="#2a7a2a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <h2>Your prompt is ready${state.firstName ? ', ' + state.firstName : ''}</h2>
+      <p class="sub">Copy this into Claude Cowork as a scheduled daily task. Set it to run at whatever time works for you, with web search turned on.</p>
+      <label style="margin-bottom:8px">Where do you want results delivered?</label>
+      <div class="tag-group">${destHtml}</div>
+      <label>Your personalized prompt</label>
+      <div class="output-box">${escHtml(prompt)}</div>
+      <button class="btn btn-primary copy-btn" onclick="copyP()">Copy prompt to clipboard</button>
+      <div class="copy-flash" id="flash">Copied to clipboard</div>
+      <div style="margin-top:4px">
+        <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:10px">Cowork setup steps</div>
+        <div class="setup-block"><div class="setup-num">Step 1</div><p>Download and open <strong>Claude Cowork</strong> on your desktop. It's free at claude.ai/download.</p></div>
+        <div class="setup-block"><div class="setup-num">Step 2</div><p>Create a new scheduled task. Paste your prompt into the task prompt field.</p></div>
+        <div class="setup-block"><div class="setup-num">Step 3</div><p><strong>Turn on web search</strong> in the task settings. This is what lets Claude scan social media and news in real time.</p></div>
+        <div class="setup-block"><div class="setup-num">Step 4</div><p>Set the schedule to your preferred time (9am works well). Set delivery to <strong>${esc(state.outputDest)}</strong>. Save and activate.</p></div>
+      </div>
+      <p class="note">No Cowork yet? You can also run this manually: open Claude.ai, turn on web search, paste the prompt, and hit send. You'll get the full briefing in the chat window.</p>
+      <div class="btn-row" style="margin-top:16px">
+        <button class="btn" onclick="go(3)">Back</button>
+        <button class="btn" onclick="window.print()">Print / Save as PDF</button>
+      </div>`;
+  }
+
+  app.innerHTML = inner;
+}
+
+function esc(s) { return (s||'').replace(/"/g,'&quot;'); }
+function escHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function s0() {
+  state.name = document.getElementById('f-name').value.trim();
+  state.firstName = document.getElementById('f-fname').value.trim();
+  state.role = document.getElementById('f-role').value.trim();
+  go(1);
+}
+function s1() {
+  state.linkedin = document.getElementById('f-li').value.trim();
+  state.instagram = document.getElementById('f-ig').value.trim();
+  state.facebook = document.getElementById('f-fb').value.trim();
+  state.twitter = document.getElementById('f-tw').value.trim();
+  state.extraAccounts = document.getElementById('f-extra').value.trim();
+  go(2);
+}
+function s2() {
+  state.family = document.getElementById('f-fam').value.trim();
+  state.friends = document.getElementById('f-friends').value.trim();
+  go(3);
+}
+function s3() {
+  state.workInterests = document.getElementById('f-work').value.trim();
+  state.personalInterests = document.getElementById('f-personal').value.trim();
+  go(4);
+}
+function go(n) { state.step = n; render(); window.scrollTo(0,0); }
+function toggleP(p) {
+  if (state.platforms.includes(p)) state.platforms = state.platforms.filter(x=>x!==p);
+  else state.platforms.push(p);
+  render();
+}
+function setT(t) { state.tone = t; render(); }
+function setD(d) { state.outputDest = d; render(); }
+
+function copyP() {
+  navigator.clipboard.writeText(buildPrompt()).then(() => {
+    const f = document.getElementById('flash');
+    if (f) { f.style.display = 'block'; setTimeout(()=>{ f.style.display='none'; }, 2500); }
+  });
+}
+
+function buildPrompt() {
+  const name = state.name || 'me';
+  const fname = state.firstName || state.name || 'me';
+  const role = state.role ? '\nRole: ' + state.role : '';
+  const accounts = [
+    state.linkedin && 'LinkedIn: ' + state.linkedin,
+    state.instagram && 'Instagram: ' + state.instagram,
+    state.facebook && 'Facebook: ' + state.facebook,
+    state.twitter && 'Twitter/X: ' + state.twitter,
+    state.extraAccounts,
+  ].filter(Boolean).join('\n');
+
+  return `You are running a daily social media and web intelligence briefing for ${name}.${role}
+
+Today's date is: [today's date]
+
+Use web search to find the most recent public posts, updates, and activity from every source below. If a source has no findable public activity, say so briefly and move on.
+
+===== SOCIAL PROFILES =====
+${accounts || 'No accounts specified.'}
+
+===== PEOPLE TO TRACK =====
+Family: ${state.family || 'None specified'}
+Friends and colleagues: ${state.friends || 'None specified'}
+
+===== PLATFORMS TO SCAN =====
+${state.platforms.join(', ')}
+
+===== TOPICS AND INTERESTS =====
+Work and professional: ${state.workInterests || 'General industry and professional news'}
+Personal: ${state.personalInterests || 'None specified'}
+
+===== OUTPUT FORMAT =====
+
+Produce the briefing in this structure:
+
+DAILY BRIEFING: [today's date]
+
+SECTION 1: FAMILY AND FRIENDS ACTIVITY
+For each person with findable public activity, list the platform, approximate post date, and a brief summary. Then write a suggested reply in ${fname}'s voice: ${state.tone}, specific and genuine, no emojis, no hyphens. Flag anything that warrants a personal follow-up with [FOLLOW UP].
+
+SECTION 2: WORK AND INDUSTRY FEED
+Top 3 to 5 posts or articles worth engaging with from ${fname}'s professional topics. For each: platform or source, author, brief summary, and a suggested comment or reply in ${fname}'s voice.
+
+SECTION 3: PERSONAL INTEREST UPDATES
+Any notable posts or news from personal interest areas. Brief summaries only.
+
+SECTION 4: POST DRAFTS FOR TODAY
+Write 1 to 2 ready-to-post updates for ${fname}'s most active platform based on the most timely findings from today's scan. Tone: ${state.tone}. No emojis. No hyphens. Format each as ready to copy and paste.
+
+SECTION 5: FLAGS AND TIME-SENSITIVE ITEMS
+Anything requiring action today: replies that should go out soon, news worth amplifying, deadlines. Mark each with [ACTION NEEDED].
+
+Keep the briefing direct and specific. No filler. Lead each section with the most important item.`;
+}
+
+render();
+</script>
+</body>
+</html>
